@@ -99,11 +99,12 @@ class AudioDeviceManager {
       this.currentSource.disconnect();
     }
 
-    if (this.inputStream) {
-      for (const track of this.getInputTracks()) {
-        track.stop();
-      }
-    }
+    console.error("setInputDevice " + deviceId + "....");
+//    if (this.inputStream) {
+//      for (const track of this.getInputTracks()) {
+//        track.stop();
+//      }
+//    }
 
     this.inputStream = await navigator.mediaDevices.getUserMedia({
       audio: { deviceId, echoCancellation: this.echoCancellationEnabled },
