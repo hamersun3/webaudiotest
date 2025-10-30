@@ -98,7 +98,7 @@ class AudioDeviceManager {
 
     console.debug("setInputDevice with id " + deviceId);
     if (this.currentSource) {
-      console.warn("\t currentSource) is not null, disconnect currentSource");
+      console.warn("\t currentSource is not null, disconnect currentSource");
       this.currentSource.disconnect();
     }
 
