@@ -35,7 +35,7 @@ class AudioDeviceManager {
   }
 
   createContext() {
-    console.debug("[[[[createContext...]]]]]")
+    console.debug("createContext...")
     if (this.ctx) {
       this.ctx.close();
     }
