@@ -100,11 +100,11 @@ class AudioDeviceManager {
     }
 
     console.error("setInputDevice " + deviceId + "....");
-//    if (this.inputStream) {
-//      for (const track of this.getInputTracks()) {
-//        track.stop();
-//      }
-//    }
+    if (this.inputStream) {
+      for (const track of this.getInputTracks()) {
+        track.stop();
+      }
+    }
 
     this.inputStream = await navigator.mediaDevices.getUserMedia({
       audio: { deviceId, echoCancellation: this.echoCancellationEnabled },
@@ -143,7 +143,7 @@ class AudioDeviceManager {
     assert(this.analyser);
     assert(this.analyserData);
 
-    this.analyser.getByteFrequencyData(this.analyserData);
+//    this.analyser.getByteFrequencyData(this.analyserData);
     let sum = 0;
     for (let i = 0; i < this.analyserData.length; i++) {
       sum += this.analyserData[i] / 255;
@@ -361,7 +361,7 @@ function App() {
       } else {
         throw new Error(`unknown stateProp ${stateProp}`);
       }
-      setStatus(devices.length ? "got devices" : "no devices found");
+      setStatus(devices.length ? "got devices ..." : "no devices found ...");
     } catch (e) {
       setStatus(`error getting devices ${e}`);
       console.error(e);
