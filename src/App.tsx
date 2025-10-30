@@ -35,6 +35,7 @@ class AudioDeviceManager {
   }
 
   createContext() {
+    console.debug("createContext...")
     if (this.ctx) {
       this.ctx.close();
     }
@@ -95,21 +96,25 @@ class AudioDeviceManager {
 
     this.currentInputDevice = deviceId;
 
+    console.debug("setInputDevice with id " + deviceId);
     if (this.currentSource) {
+      console.warn("\t currentSource) is not null, disconnect currentSource");
       this.currentSource.disconnect();
     }
 
-    console.error("setInputDevice " + deviceId + "....");
+    console.debug("setInputDevice " + deviceId + "....");
     if (this.inputStream) {
       for (const track of this.getInputTracks()) {
         track.stop();
       }
     }
 
+    console.debug("setInputDevice: call navigator.mediaDevices.getUserMedia to create inputStream");
     this.inputStream = await navigator.mediaDevices.getUserMedia({
       audio: { deviceId, echoCancellation: this.echoCancellationEnabled },
     });
 
+    console.debug("setInputDevice: call createMediaStreamSource..");
     this.currentSource = this.ctx.createMediaStreamSource(this.inputStream);
     this.delayNode = new DelayNode(this.ctx, { delayTime: 1 });
 
@@ -119,17 +124,21 @@ class AudioDeviceManager {
     } else {
       this.currentSource.connect(this.analyser);
     }
+    console.debug("inputStream: " + this.inputStream);
   }
 
   async setOutputDevice(deviceId: string) {
     assert(this.ctx, "no audio context");
     assert(this.outputNode, "no output node");
+    console.debug("setOutputDevice with id: " + deviceId);
 
     this.currentOutputDevice = deviceId;
 
     this.outputNode.disconnect();
+    console.debug("setOutputDevice: call createMediaStreamDestination");
     const dest = this.ctx.createMediaStreamDestination();
     this.outputNode.connect(dest);
+    console.debug("\t dest: " + dest);
 
     const audioOutput = new Audio();
     audioOutput.srcObject = dest.stream;
