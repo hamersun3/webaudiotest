@@ -320,7 +320,7 @@ function Devices({
 
 type DevicesStateProp = "inputDevices" | "outputDevices";
 
-const audioDeviceManager: AudioDeviceManager = new AudioDeviceManager();
+//const audioDeviceManager: AudioDeviceManager = new AudioDeviceManager();
 
 function App() {
   const [status, setStatus] = useState<string>("");
@@ -335,6 +335,7 @@ function App() {
   const [echoCancellationEnabled, setEchoCancellationEnabled] =
     useState<boolean>(false);
 
+  const audioDeviceManager: AudioDeviceManager = new AudioDeviceManager();
   useEffect(() => {
     document.addEventListener("click", () =>
       audioDeviceManager.resumeContext(),
