@@ -9,9 +9,9 @@ function assert(condition: any, message?: string): asserts condition {
 }
 
 class AudioDeviceManager {
-  currentInputDevice?: string;
-  currentOutputDevice?: string;
-  outputNode?: AudioNode;
+  currentInputDevices: string[];
+  currentOutputDevices: string[];
+  outputNodes: AudioNode[];
   analyser?: AnalyserNode;
   audioBuffer?: AudioBufferSourceNode;
   decodedAudioData?: AudioBuffer;
@@ -21,8 +21,9 @@ class AudioDeviceManager {
   audioElement: HTMLAudioElement;
   ctx?: AudioContext;
   analyserData?: Uint8Array;
-  currentSource?: AudioNode;
-  inputStream?: MediaStream;
+  currentSources: AudioNode[];
+  inputStreams: MediaStream[];
+  nextIndex: number;
 
   constructor() {
     this.audioElement = document.createElement("audio");
@@ -31,6 +32,12 @@ class AudioDeviceManager {
     this.audioElement.volume = 0.2;
     document.body.append(this.audioElement);
 
+    this.currentInputDevices = new Array<string>();
+    this.currentOutputDevices = new Array<string>();
+    this.outputNodes = new Array<AudioNode>();
+    this.currentSources = new Array<AudioNode>();
+    this.inputStreams = new Array<MediaStream>();
+    this.nextIndex = 0;
     this.createContext();
   }
 
@@ -45,22 +52,31 @@ class AudioDeviceManager {
 
     this.ctx = new window.AudioContext();
 
-    this.outputNode = this.ctx.createGain();
-    this.outputNode.connect(this.ctx.destination);
+    this.outputNodes[0] = this.ctx.createGain();
+    this.outputNodes[0].connect(this.ctx.destination);
+    this.outputNodes[1] = this.ctx.createGain();
+    this.outputNodes[1].connect(this.ctx.destination);
 
     this.analyser = this.ctx.createAnalyser();
-    this.analyser.connect(this.outputNode);
+    this.analyser.connect(this.outputNodes[0]);
     this.analyser.fftSize = 32;
     this.analyserData = new Uint8Array(this.analyser.frequencyBinCount);
 
     delete this.audioBuffer;
     delete this.decodedAudioData;
 
-    if (this.currentInputDevice) {
-      this.setInputDevice(this.currentInputDevice);
+    if (this.currentInputDevices[0]) {
+      this.setInputDevice(this.currentInputDevices[0]);
     }
-    if (this.currentOutputDevice) {
-      this.setOutputDevice(this.currentOutputDevice);
+    if (this.currentInputDevices[1]) {
+      this.setInputDevice(this.currentInputDevices[1]);
+    }
+    
+    if (this.currentOutputDevices[0]) {
+      this.setOutputDevice(this.currentOutputDevices[0]);
+    }
+    if (this.currentOutputDevices[1]) {
+      this.setOutputDevice(this.currentOutputDevices[1]);
     }
   }
 
@@ -93,51 +109,56 @@ class AudioDeviceManager {
   async setInputDevice(deviceId: string) {
     assert(this.ctx, "no audio context");
     assert(this.analyser, "no analyser");
+    if ((this.nextIndex + 1) % 2 == 0) {
+      this.nextIndex = 0;
+    } else {
+      this.nextIndex++;
+    }
 
-    this.currentInputDevice = deviceId;
+    this.currentInputDevices[this.nextIndex] = deviceId;
 
     console.debug("setInputDevice with id " + deviceId);
-    if (this.currentSource) {
+    if (this.currentSources[this.nextIndex]) {
       console.warn("\t currentSource is not null, disconnect currentSource");
-      this.currentSource.disconnect();
+      this.currentSources[this.nextIndex].disconnect();
     }
 
     console.debug("setInputDevice " + deviceId + "....");
-    if (this.inputStream) {
+    if (this.inputStreams[this.nextIndex]) {
       for (const track of this.getInputTracks()) {
         track.stop();
       }
     }
 
     console.debug("setInputDevice: call navigator.mediaDevices.getUserMedia to create inputStream");
-    this.inputStream = await navigator.mediaDevices.getUserMedia({
+    this.inputStreams[this.nextIndex] = await navigator.mediaDevices.getUserMedia({
       audio: { deviceId, echoCancellation: this.echoCancellationEnabled },
     });
 
     console.debug("setInputDevice: call createMediaStreamSource..");
-    this.currentSource = this.ctx.createMediaStreamSource(this.inputStream);
+    this.currentSources[this.nextIndex] = this.ctx.createMediaStreamSource(this.inputStreams[this.nextIndex]);
     this.delayNode = new DelayNode(this.ctx, { delayTime: 1 });
 
     if (this.delayEnabled) {
-      this.currentSource.connect(this.delayNode);
+      this.currentSources[this.nextIndex].connect(this.delayNode);
       this.delayNode.connect(this.analyser);
     } else {
-      this.currentSource.connect(this.analyser);
+      this.currentSources[this.nextIndex].connect(this.analyser);
     }
-    console.debug("inputStream: " + this.inputStream);
+    console.debug("inputStream: " + this.inputStreams[this.nextIndex]);
   }
 
   async setOutputDevice(deviceId: string) {
     assert(this.ctx, "no audio context");
-    assert(this.outputNode, "no output node");
+    assert(this.outputNodes[this.nextIndex], "no output node");
     console.debug("setOutputDevice with id: " + deviceId);
 
-    this.currentOutputDevice = deviceId;
+    this.currentOutputDevices[this.nextIndex] = deviceId;
 
-    this.outputNode.disconnect();
+    this.outputNodes[this.nextIndex].disconnect();
     console.debug("setOutputDevice: call createMediaStreamDestination");
     const dest = this.ctx.createMediaStreamDestination();
-    this.outputNode.connect(dest);
+    this.outputNodes[this.nextIndex].connect(dest);
     console.debug("\t dest: " + dest);
 
     const audioOutput = new Audio();
@@ -162,8 +183,8 @@ class AudioDeviceManager {
   }
 
   getInputTracks() {
-    assert(this.inputStream);
-    return this.inputStream.getAudioTracks();
+    assert(this.inputStreams[this.nextIndex]);
+    return this.inputStreams[this.nextIndex].getAudioTracks();
   }
 
   getConstraints() {
@@ -186,7 +207,7 @@ class AudioDeviceManager {
       return true;
     } else {
       assert(this.ctx);
-      assert(this.outputNode);
+      assert(this.outputNodes[this.nextIndex]);
 
       this.audioBuffer = this.ctx.createBufferSource();
 
@@ -199,7 +220,7 @@ class AudioDeviceManager {
 
       this.audioBuffer.buffer = this.decodedAudioData;
 
-      this.audioBuffer.connect(this.outputNode);
+      this.audioBuffer.connect(this.outputNodes[this.nextIndex]);
       this.audioBuffer.loop = true;
       this.audioBuffer.start();
 
@@ -211,16 +232,16 @@ class AudioDeviceManager {
     assert(this.analyser);
 
     if (this.delayEnabled) {
-      if (this.currentSource && this.delayNode) {
-        this.currentSource.disconnect();
+      if (this.currentSources[this.nextIndex] && this.delayNode) {
+        this.currentSources[this.nextIndex].disconnect();
         this.delayNode.disconnect();
-        this.currentSource.connect(this.analyser);
+        this.currentSources[this.nextIndex].connect(this.analyser);
       }
       this.delayEnabled = false;
     } else {
-      if (this.currentSource && this.delayNode) {
-        this.currentSource.disconnect();
-        this.currentSource.connect(this.delayNode);
+      if (this.currentSources[this.nextIndex] && this.delayNode) {
+        this.currentSources[this.nextIndex].disconnect();
+        this.currentSources[this.nextIndex].connect(this.delayNode);
         this.delayNode.connect(this.analyser);
       }
       this.delayEnabled = true;
@@ -230,8 +251,8 @@ class AudioDeviceManager {
 
   toggleEchoCancellation() {
     this.echoCancellationEnabled = !this.echoCancellationEnabled;
-    if (this.currentInputDevice) {
-      this.setInputDevice(this.currentInputDevice);
+    if (this.currentInputDevices[this.nextIndex]) {
+      this.setInputDevice(this.currentInputDevices[this.nextIndex]);
     }
     return this.echoCancellationEnabled;
   }
